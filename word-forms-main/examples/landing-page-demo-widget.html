@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Studio Demo — Site com widget</title>
+    <style>
+      :root {
+        --brand: #9d174d;
+        --ink: #0f172a;
+        --muted: #475569;
+        --bg: #fef2f4;
+      }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; color: var(--ink); background: #fff; }
+      .nav { display: flex; align-items: center; justify-content: space-between; padding: 16px 32px; border-bottom: 1px solid #e5e7eb; }
+      .nav .logo { font-weight: 700; letter-spacing: -0.02em; }
+      .nav nav a { margin-left: 24px; color: var(--muted); text-decoration: none; font-size: 14px; }
+      .hero { background: var(--bg); padding: 96px 32px; text-align: center; }
+      .hero h1 { font-size: clamp(32px, 5vw, 56px); margin: 0 0 16px; letter-spacing: -0.03em; line-height: 1.05; }
+      .hero p { font-size: 18px; color: var(--muted); max-width: 580px; margin: 0 auto; line-height: 1.5; }
+      .container { max-width: 1080px; margin: 0 auto; padding: 0 32px; }
+      .section { padding: 80px 0; }
+      .section h2 { font-size: 32px; letter-spacing: -0.02em; margin: 0 0 8px; }
+      .grid-feat { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; margin-top: 32px; }
+      .feat { background: #fafafa; border: 1px solid #e5e7eb; border-radius: 16px; padding: 24px; }
+      .feat h3 { margin: 0 0 8px; font-size: 18px; }
+      .feat p { color: var(--muted); margin: 0; font-size: 14px; line-height: 1.5; }
+      .hint { background: #ecfeff; border: 1px solid #67e8f9; color: #155e75; padding: 16px 20px; border-radius: 12px; font-size: 14px; }
+      .footer { background: #0f172a; color: #cbd5e1; padding: 32px; text-align: center; font-size: 13px; margin-top: 64px; }
+      @media (max-width: 760px) {
+        .grid-feat { grid-template-columns: 1fr; }
+        .hero { padding: 64px 24px; }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="nav">
+      <span class="logo">studio<strong style="color: var(--brand)">.</strong>demo</span>
+      <nav>
+        <a href="#sobre">Sobre</a>
+        <a href="#servicos">Serviços</a>
+      </nav>
+    </header>
+
+    <section class="hero">
+      <h1>Olá, somos a Studio Demo</h1>
+      <p>Aqui transformamos suas ideias em realidade. Quer conversar? Use a bolha de chat no canto inferior direito 👇</p>
+    </section>
+
+    <section id="servicos" class="section">
+      <div class="container">
+        <h2>O que oferecemos</h2>
+        <p style="color: var(--muted); margin: 0;">Soluções pensadas pra cada momento do seu negócio.</p>
+
+        <div class="grid-feat">
+          <div class="feat"><h3>Atendimento</h3><p>Equipe pronta para responder pelo WhatsApp em até 1h.</p></div>
+          <div class="feat"><h3>Novidades</h3><p>Você fica sabendo primeiro de tudo o que lançamos.</p></div>
+          <div class="feat"><h3>Cupons exclusivos</h3><p>Quem deixa contato recebe condições especiais.</p></div>
+        </div>
+
+        <p class="hint" style="margin-top: 48px;">
+          💡 Esse site demo é só um esqueleto pra você ver o widget em ação. O botão flutuante no canto
+          é injetado pelo <code>&lt;script&gt;</code> do <strong>word-forms</strong>.
+        </p>
+      </div>
+    </section>
+
+    <footer class="footer">
+      studio.demo — landing page de exemplo · widget servido por <code style="color: #fff">word-forms</code>
+    </footer>
+
+    <!-- ⬇ Widget: botão flutuante (FAB) no canto inferior direito -->
+    <script
+      src="http://localhost:3100/embed.js"
+      data-form="demo"
+      data-mode="bubble"
+      data-position="bottom-right"
+      data-color="#9d174d"
+      data-label="Fale com a gente"
+      async
+    ></script>
+    <!-- ⬆ -->
+  </body>
+</html>

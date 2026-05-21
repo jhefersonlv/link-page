@@ -9,14 +9,36 @@ let API_SECRET = '';
 let WHATSAPP = '';
 let BUSINESS_NAME = '';
 
+let WORDFORMS_ENABLED = false;
+let WORDFORMS_SUBDOMAIN = '';
+let WORDFORMS_HOST = '';
+
 function loadConfig() {
   try {
     return Object.assign(
-      { businessName: '', apiUrl: '', apiKey: '', apiSecret: '', whatsapp: '' },
+      { 
+        businessName: '', 
+        apiUrl: '', 
+        apiKey: '', 
+        apiSecret: '', 
+        whatsapp: '',
+        wordFormsEnabled: false,
+        wordFormsSubdomain: 'demo',
+        wordFormsHost: 'http://localhost:3100'
+      },
       JSON.parse(localStorage.getItem(CONFIG_KEY) || '{}')
     );
   } catch (_) {
-    return { businessName: '', apiUrl: '', apiKey: '', apiSecret: '', whatsapp: '' };
+    return { 
+      businessName: '', 
+      apiUrl: '', 
+      apiKey: '', 
+      apiSecret: '', 
+      whatsapp: '',
+      wordFormsEnabled: false,
+      wordFormsSubdomain: 'demo',
+      wordFormsHost: 'http://localhost:3100'
+    };
   }
 }
 
@@ -68,6 +90,10 @@ async function initApp() {
   API_SECRET = cfg.apiSecret;
   WHATSAPP = cfg.whatsapp;
   BUSINESS_NAME = cfg.businessName;
+  
+  WORDFORMS_ENABLED = cfg.wordFormsEnabled;
+  WORDFORMS_SUBDOMAIN = cfg.wordFormsSubdomain;
+  WORDFORMS_HOST = cfg.wordFormsHost;
 
   // 2. Aplica tema inicial (mock ou customizado)
   applyTheme(state.theme);
@@ -183,7 +209,7 @@ async function loadApiData() {
   }
 }
 
-// Carrega os dados mockados locais (Fallback)
+// --- CONFIGURAÇÃO DE FALLBACK ---
 function loadLocalFallback() {
   document.getElementById('company-name').textContent = mockData.profile.companyName;
   document.getElementById('company-bio').textContent = mockData.profile.bio;
@@ -296,9 +322,8 @@ function renderProducts(products) {
       const productId = btn.getAttribute('data-product-id');
       const item = state.catalogItems.find(i => i.id === productId);
       
-      // Se for um produto e tiver WhatsApp configurado, podemos redirecionar direto ou abrir formulário
-      if (item && !item.isService && WHATSAPP) {
-        // Redireciona diretamente para o WhatsApp do usuário de acordo com o padrão do projeto anterior
+      // Se for um produto e tiver WhatsApp configurado (e Word Forms desativado), redireciona direto
+      if (item && !item.isService && WHATSAPP && !WORDFORMS_ENABLED) {
         const waText = encodeURIComponent(`Olá! Tenho interesse no produto: *${item.name}*`);
         const waUrl = `https://wa.me/${WHATSAPP}?text=${waText}`;
         window.open(waUrl, '_blank');
@@ -409,23 +434,50 @@ function openContactModal(interestedProduct = null) {
   const interestInput = document.getElementById('form-product-interest');
   const messageArea = document.getElementById('form-message');
   const modalTitle = document.querySelector('.modal-header h3');
+  const modalHeader = document.querySelector('#contact-modal .modal-header');
+  const iframeContainer = document.getElementById('wordforms-iframe-container');
   
   if (!modal) return;
   
-  if (contactForm) {
-    contactForm.reset();
-    contactForm.style.display = 'flex';
-  }
-  if (formSuccess) formSuccess.classList.add('hidden');
-  
-  if (interestedProduct) {
-    if (interestInput) interestInput.value = interestedProduct;
-    if (messageArea) messageArea.value = `Gostaria de solicitar contato e orçamento sobre o serviço: ${interestedProduct}.`;
-    if (modalTitle) modalTitle.textContent = `Interesse: ${interestedProduct}`;
+  if (WORDFORMS_ENABLED) {
+    // Usar a integração com o Word Forms Conversacional
+    if (modalHeader) modalHeader.style.display = 'none';
+    if (contactForm) contactForm.style.display = 'none';
+    if (formSuccess) formSuccess.classList.add('hidden');
+    
+    const host = WORDFORMS_HOST || 'http://localhost:3100';
+    const subdomain = WORDFORMS_SUBDOMAIN || 'demo';
+    const fillQs = '?fill=true';
+    const embedUrl = `${host}/embed/${encodeURIComponent(subdomain)}${fillQs}`;
+    
+    console.log('[Word Forms] Renderizando formulário conversacional:', embedUrl);
+    
+    if (iframeContainer) {
+      iframeContainer.innerHTML = `<iframe src="${embedUrl}" title="Formulário Conversacional" loading="lazy" allow="clipboard-write" style="border:0;width:100%;height:520px;display:block;background:transparent;color-scheme:normal;"></iframe>`;
+      iframeContainer.classList.remove('hidden');
+    }
   } else {
-    if (interestInput) interestInput.value = '';
-    if (messageArea) messageArea.value = mockData.profile.contactButton.placeholderMessage || '';
-    if (modalTitle) modalTitle.textContent = 'Solicitar Contato';
+    // Usar o formulário HTML tradicional padrão da Landing Page
+    if (iframeContainer) {
+      iframeContainer.innerHTML = '';
+      iframeContainer.classList.add('hidden');
+    }
+    if (modalHeader) modalHeader.style.display = 'block';
+    if (contactForm) {
+      contactForm.reset();
+      contactForm.style.display = 'flex';
+    }
+    if (formSuccess) formSuccess.classList.add('hidden');
+    
+    if (interestedProduct) {
+      if (interestInput) interestInput.value = interestedProduct;
+      if (messageArea) messageArea.value = `Gostaria de solicitar contato e orçamento sobre o serviço: ${interestedProduct}.`;
+      if (modalTitle) modalTitle.textContent = `Interesse: ${interestedProduct}`;
+    } else {
+      if (interestInput) interestInput.value = '';
+      if (messageArea) messageArea.value = mockData.profile.contactButton.placeholderMessage || '';
+      if (modalTitle) modalTitle.textContent = 'Solicitar Contato';
+    }
   }
   
   modal.classList.add('open');
@@ -434,7 +486,16 @@ function openContactModal(interestedProduct = null) {
 
 function closeContactModal() {
   const modal = document.getElementById('contact-modal');
+  const iframeContainer = document.getElementById('wordforms-iframe-container');
+  
   if (!modal) return;
+  
+  // Limpa o conteúdo do iframe para interromper carregamento e liberar memória ao fechar
+  if (iframeContainer) {
+    iframeContainer.innerHTML = '';
+    iframeContainer.classList.add('hidden');
+  }
+  
   modal.classList.remove('open');
   document.body.style.overflow = '';
 }
@@ -449,6 +510,9 @@ function initConfigModal() {
   const secretInput = document.getElementById('cfg-api-secret');
   const secretToggle = document.getElementById('cfg-secret-toggle');
   
+  const wordformsEnabledCheck = document.getElementById('cfg-wordforms-enabled');
+  const wordformsFields = document.getElementById('wordforms-fields');
+
   if (!configOverlay) return;
 
   if (settingsBtn) {
@@ -464,6 +528,14 @@ function initConfigModal() {
   configOverlay.addEventListener('click', (e) => {
     if (e.target === configOverlay) closeConfigModal();
   });
+
+  // Alternar campos do Word Forms
+  if (wordformsEnabledCheck && wordformsFields) {
+    const toggleWordformsFields = () => {
+      wordformsFields.style.display = wordformsEnabledCheck.checked ? 'flex' : 'none';
+    };
+    wordformsEnabledCheck.addEventListener('change', toggleWordformsFields);
+  }
 
   // Mostrar/Ocultar Segredo
   if (secretToggle && secretInput) {
@@ -486,7 +558,11 @@ function initConfigModal() {
         apiUrl: document.getElementById('cfg-api-url').value.trim().replace(/\/$/, ''),
         apiKey: document.getElementById('cfg-api-key').value.trim(),
         apiSecret: document.getElementById('cfg-api-secret').value.trim(),
-        whatsapp: document.getElementById('cfg-whatsapp').value.replace(/\D/g, '')
+        whatsapp: document.getElementById('cfg-whatsapp').value.replace(/\D/g, ''),
+        
+        wordFormsEnabled: document.getElementById('cfg-wordforms-enabled').checked,
+        wordFormsSubdomain: document.getElementById('cfg-wordforms-subdomain').value.trim(),
+        wordFormsHost: document.getElementById('cfg-wordforms-host').value.trim().replace(/\/$/, '')
       };
       
       persistConfig(cfg);
@@ -506,6 +582,19 @@ function openConfigModal() {
   document.getElementById('cfg-api-key').value = cfg.apiKey;
   document.getElementById('cfg-api-secret').value = cfg.apiSecret;
   document.getElementById('cfg-whatsapp').value = cfg.whatsapp;
+  
+  const wordformsEnabledCheck = document.getElementById('cfg-wordforms-enabled');
+  const wordformsFields = document.getElementById('wordforms-fields');
+  
+  if (wordformsEnabledCheck) {
+    wordformsEnabledCheck.checked = cfg.wordFormsEnabled;
+  }
+  document.getElementById('cfg-wordforms-subdomain').value = cfg.wordFormsSubdomain;
+  document.getElementById('cfg-wordforms-host').value = cfg.wordFormsHost;
+  
+  if (wordformsFields && wordformsEnabledCheck) {
+    wordformsFields.style.display = wordformsEnabledCheck.checked ? 'flex' : 'none';
+  }
   
   const configOverlay = document.getElementById('config-overlay');
   if (configOverlay) {

@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Studio Demo — Landing page</title>
+    <style>
+      :root {
+        --brand: #9d174d;
+        --ink: #0f172a;
+        --muted: #475569;
+        --bg: #fef2f4;
+      }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; color: var(--ink); background: #fff; }
+      .nav { display: flex; align-items: center; justify-content: space-between; padding: 16px 32px; border-bottom: 1px solid #e5e7eb; }
+      .nav .logo { font-weight: 700; letter-spacing: -0.02em; }
+      .nav nav a { margin-left: 24px; color: var(--muted); text-decoration: none; font-size: 14px; }
+      .hero { background: var(--bg); padding: 80px 32px; text-align: center; }
+      .hero h1 { font-size: clamp(32px, 5vw, 56px); margin: 0 0 16px; letter-spacing: -0.03em; line-height: 1.05; }
+      .hero p { font-size: 18px; color: var(--muted); max-width: 580px; margin: 0 auto; line-height: 1.5; }
+      .container { max-width: 1080px; margin: 0 auto; padding: 0 32px; }
+      .section { padding: 80px 0; }
+      .section h2 { font-size: 32px; letter-spacing: -0.02em; margin: 0 0 8px; }
+      .section p.lead { color: var(--muted); margin: 0 0 32px; }
+      .grid { display: grid; grid-template-columns: 1.2fr 1fr; gap: 48px; align-items: start; }
+      .pitch ul { margin: 0; padding-left: 20px; color: var(--muted); line-height: 1.7; }
+      .pitch ul li::marker { color: var(--brand); }
+      .form-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 20px; overflow: hidden; box-shadow: 0 12px 32px -16px rgba(15, 23, 42, 0.15); }
+      .form-card .head { padding: 18px 22px; border-bottom: 1px solid #e5e7eb; background: linear-gradient(180deg, #fff, #fafafa); }
+      .form-card .head .badge { display: inline-block; background: var(--brand); color: #fff; padding: 2px 8px; border-radius: 999px; font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; margin-bottom: 6px; }
+      .form-card .head h3 { margin: 4px 0 2px; font-size: 18px; }
+      .form-card .head small { color: var(--muted); font-size: 12px; }
+      .footer { background: #0f172a; color: #cbd5e1; padding: 32px; text-align: center; font-size: 13px; margin-top: 80px; }
+      @media (max-width: 760px) {
+        .grid { grid-template-columns: 1fr; }
+        .hero { padding: 56px 24px; }
+        .container { padding: 0 20px; }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="nav">
+      <span class="logo">studio<strong style="color: var(--brand)">.</strong>demo</span>
+      <nav>
+        <a href="#sobre">Sobre</a>
+        <a href="#contato">Contato</a>
+      </nav>
+    </header>
+
+    <section class="hero">
+      <h1>Quer saber sobre nossas novidades?</h1>
+      <p>Deixe seu contato no formulário abaixo e mandamos as melhores promoções, novidades e cupons direto pro seu WhatsApp.</p>
+    </section>
+
+    <section id="contato" class="section">
+      <div class="container">
+        <div class="grid">
+          <div class="pitch">
+            <h2>Como funciona</h2>
+            <p class="lead">É só preencher rapidinho — leva menos de 1 minuto.</p>
+            <ul>
+              <li>Recebemos seu contato direto no nosso CRM</li>
+              <li>Você marca os assuntos que tem interesse</li>
+              <li>Nossa equipe entra em contato pelo WhatsApp</li>
+              <li>Sem spam, sem ligação fora de hora</li>
+            </ul>
+          </div>
+
+          <div class="form-card">
+            <div class="head">
+              <span class="badge">Fale com a gente</span>
+              <h3>Formulário rápido</h3>
+              <small>Form embedado via &lt;script&gt; do word-forms</small>
+            </div>
+            <!-- ⬇ snippet que o dev da landing usa -->
+            <script
+              src="http://localhost:3100/embed.js"
+              data-form="demo"
+              data-min-height="520"
+              data-max-height="780"
+              async
+            ></script>
+            <!-- ⬆ -->
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <footer class="footer">
+      studio.demo — landing page de exemplo · form servido por <code style="color: #fff">word-forms</code>
+    </footer>
+  </body>
+</html>
