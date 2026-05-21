@@ -16,6 +16,18 @@
   <!-- Container Principal do Aplicativo (Centralizado, Mobile-First) -->
   <main class="app-wrapper">
     <div class="mobile-container">
+      <!-- Botão flutuante de configurações da API -->
+      <button id="settings-btn" class="settings-floating-btn" aria-label="Configurar Integração">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="3"></circle>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+        </svg>
+      </button>
+
+      <!-- Banner de aviso se a API não estiver configurada -->
+      <div id="config-banner" class="config-banner" style="display: none;">
+        <span>⚠️ Clique aqui para configurar a API de Integração.</span>
+      </div>
       
       <!-- Cabeçalho do Perfil -->
       <header class="profile-header">
@@ -180,6 +192,57 @@
         <span class="info-badge">Modo Admin Ativo</span>
         <p>A API salva a paleta de cores, arredondamentos dos botões, fontes e efeitos. O site se adapta automaticamente.</p>
       </div>
+    </div>
+  </div>
+
+  </div>
+
+  <!-- Modal de Configuração da API -->
+  <div id="config-overlay" class="modal-overlay">
+    <div class="modal-content">
+      <button id="config-close" class="modal-close-btn" aria-label="Fechar Configurações">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+      </button>
+      
+      <div class="modal-header">
+        <h3>Configurar Integração API</h3>
+        <p>Configure as credenciais para carregar os produtos, serviços, WhatsApp e o nome da empresa em tempo real.</p>
+      </div>
+
+      <form id="config-form" class="contact-form" onsubmit="event.preventDefault();">
+        <div class="form-group">
+          <label for="cfg-business-name">Nome da Empresa</label>
+          <input type="text" id="cfg-business-name" placeholder="Ex: Orbit Digital">
+        </div>
+        
+        <div class="form-group">
+          <label for="cfg-api-url">URL da API (Endpoint Base)</label>
+          <input type="url" id="cfg-api-url" placeholder="Ex: https://api.barberpro.com.br">
+        </div>
+
+        <div class="form-group">
+          <label for="cfg-api-key">X-API-Key</label>
+          <input type="text" id="cfg-api-key" placeholder="Insira a chave da API">
+        </div>
+
+        <div class="form-group">
+          <label for="cfg-api-secret">X-API-Secret (Opcional)</label>
+          <div class="password-input-wrapper" style="position: relative;">
+            <input type="password" id="cfg-api-secret" placeholder="Insira o segredo da API" style="padding-right: 70px; background: rgba(0, 0, 0, 0.3); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 12px 16px; color: #ffffff; width: 100%;">
+            <button type="button" id="cfg-secret-toggle" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--secondary-color); font-size: 0.75rem; cursor: pointer; font-weight: 600;">Mostrar</button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="cfg-whatsapp">WhatsApp (DDD + Número)</label>
+          <input type="text" id="cfg-whatsapp" placeholder="Ex: 5511999999999">
+        </div>
+
+        <div style="display: flex; gap: 12px; margin-top: 12px;">
+          <button type="button" id="btn-config-cancel" class="btn-primary-muted" style="flex: 1;">Cancelar</button>
+          <button type="button" id="btn-config-save" class="btn-submit" style="flex: 1; margin-top: 0;">Salvar Configurações</button>
+        </div>
+      </form>
     </div>
   </div>
 

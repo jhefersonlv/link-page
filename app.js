@@ -1,38 +1,199 @@
 import { mockData, themePresets } from './mockData.js';
 
-// --- INICIALIZAÇÃO E CONTROLE DE ESTADOS ---
+// --- CONFIGURAÇÃO DA API (localStorage) ---
+const CONFIG_KEY = 'barberpro_site_config';
+
+let API_URL = '';
+let API_KEY = '';
+let API_SECRET = '';
+let WHATSAPP = '';
+let BUSINESS_NAME = '';
+
+function loadConfig() {
+  try {
+    return Object.assign(
+      { businessName: '', apiUrl: '', apiKey: '', apiSecret: '', whatsapp: '' },
+      JSON.parse(localStorage.getItem(CONFIG_KEY) || '{}')
+    );
+  } catch (_) {
+    return { businessName: '', apiUrl: '', apiKey: '', apiSecret: '', whatsapp: '' };
+  }
+}
+
+function persistConfig(cfg) {
+  localStorage.setItem(CONFIG_KEY, JSON.stringify(cfg));
+}
+
+// --- CHAMADA DE API ---
+async function apiCall(endpoint, options = {}) {
+  if (!API_URL || !API_KEY) throw new Error('API não configurada.');
+  
+  const resp = await fetch(`${API_URL}${endpoint}`, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      'X-API-Key': API_KEY,
+      'X-API-Secret': API_SECRET,
+      ...(options.headers || {}),
+    },
+  });
+  
+  let data = {};
+  try { data = await resp.json(); } catch (_) {}
+  
+  if (!resp.ok) {
+    const msg = data.message || data.error || data.errors?.[0]?.message || `Erro HTTP ${resp.status}`;
+    console.error('[API Error]', resp.status, endpoint, data);
+    throw new Error(msg);
+  }
+  return data;
+}
+
+// --- ESTADO GLOBAL ---
+const state = {
+  catalogItems: [],
+  theme: mockData.theme
+};
+
+// --- INICIALIZAÇÃO ---
 document.addEventListener('DOMContentLoaded', () => {
   initApp();
 });
 
-function initApp() {
-  // Carrega e aplica o tema inicial
-  applyTheme(mockData.theme);
+async function initApp() {
+  // 1. Carrega configuração da API
+  const cfg = loadConfig();
+  API_URL = cfg.apiUrl;
+  API_KEY = cfg.apiKey;
+  API_SECRET = cfg.apiSecret;
+  WHATSAPP = cfg.whatsapp;
+  BUSINESS_NAME = cfg.businessName;
+
+  // 2. Aplica tema inicial (mock ou customizado)
+  applyTheme(state.theme);
+
+  // 3. Gerencia exibições baseadas na configuração da API
+  const configBanner = document.getElementById('config-banner');
   
-  // Renderiza informações de perfil e cabeçalho
-  renderProfile(mockData.profile);
-  
-  // Renderiza botões de redes sociais
-  renderSocials(mockData.socials);
-  
-  // Renderiza catálogo de produtos/serviços
-  renderProducts(mockData.products);
-  
-  // Inicializa eventos do formulário de contato
+  if (API_URL && API_KEY) {
+    // API configurada: Esconde o banner de aviso e carrega os dados reais
+    if (configBanner) configBanner.style.display = 'none';
+    
+    // Atualiza cabeçalho com dados da API
+    const companyName = BUSINESS_NAME || 'Orbit';
+    document.getElementById('company-name').textContent = companyName;
+    document.title = `${companyName} — Linktree`;
+    
+    try {
+      await loadApiData();
+    } catch (err) {
+      console.warn('Erro ao carregar dados da API. Usando dados locais como fallback:', err.message);
+      loadLocalFallback();
+    }
+  } else {
+    // API não configurada: Mostra banner de aviso e carrega os dados locais
+    if (configBanner) {
+      configBanner.style.display = 'block';
+      configBanner.addEventListener('click', openConfigModal);
+    }
+    loadLocalFallback();
+  }
+
+  // 4. Inicializa interações do formulário, layout e tweaks
   initContactForm();
-  
-  // Inicializa o switch de layout (Grid vs Carrossel)
   initLayoutSwitcher();
-  
-  // Inicializa painel administrativo (tweak de temas)
   initTweakPanel();
+  initConfigModal();
 }
 
-// --- MECANISMO DE TEMA DINÂMICO (INJEÇÃO DE VARIÁVEIS CSS E FONTES) ---
+// Carrega os dados diretamente da API configurada pelo usuário
+async function loadApiData() {
+  console.log('[API] Carregando serviços e produtos...');
+  
+  // Executa chamadas simultâneas à API
+  const promises = [
+    apiCall('/external/v1/services').catch(() => ({ services: [] })),
+    apiCall('/external/v1/products').catch(() => ({ products: [] })),
+    apiCall('/external/v1/theme').catch(() => null) // Se houver endpoint de tema futuro
+  ];
+  
+  const [svcData, prodData, themeData] = await Promise.all(promises);
+  
+  const items = [];
+  
+  // Processa e mapeia Serviços (/external/v1/services)
+  if (svcData && svcData.services) {
+    const services = svcData.services.filter(s => s.isActive !== false);
+    services.forEach(s => {
+      items.push({
+        id: `svc-${s.id}`,
+        name: s.name,
+        description: s.details || '',
+        price: s.unitPrice ? fmtCurrency(s.unitPrice) : null,
+        image: s.imageUrl || 'assets/product_ai.png',
+        buttonText: 'Agendar Serviço',
+        isService: true
+      });
+    });
+  }
+
+  // Processa e mapeia Produtos (/external/v1/products)
+  if (prodData && prodData.products) {
+    const products = prodData.products.filter(p => p.isActive !== false);
+    products.forEach(p => {
+      const imgUrl = getMainImage(p);
+      const variant = getFirstVariant(p);
+      const sale = parseFloat(variant?.price?.salePrice || 0);
+      const list = parseFloat(variant?.price?.listPrice || 0);
+      const price = sale > 0 ? sale : list;
+      
+      items.push({
+        id: `prod-${p.id}`,
+        name: p.name,
+        description: p.description || '',
+        price: price > 0 ? fmtCurrency(price) : null,
+        image: imgUrl || 'assets/product_saas.png',
+        buttonText: 'Comprar Produto',
+        isService: false
+      });
+    });
+  }
+
+  // Se o endpoint de tema retornar estilos dinâmicos, aplica-os
+  if (themeData && themeData.theme) {
+    state.theme = { ...state.theme, ...themeData.theme };
+    applyTheme(state.theme);
+  }
+
+  state.catalogItems = items;
+
+  if (items.length === 0) {
+    const container = document.getElementById('catalog-container');
+    if (container) {
+      container.innerHTML = '<p style="text-align:center;color:var(--text-muted);padding:40px;grid-column: span 2;">Nenhum produto ou serviço ativo retornado pela API.</p>';
+    }
+  } else {
+    renderProducts(items);
+  }
+
+  // Atualiza bio de perfil se configurado
+  const companyBio = document.getElementById('company-bio');
+  if (companyBio) {
+    companyBio.textContent = mockData.profile.bio;
+  }
+}
+
+// Carrega os dados mockados locais (Fallback)
+function loadLocalFallback() {
+  document.getElementById('company-name').textContent = mockData.profile.companyName;
+  document.getElementById('company-bio').textContent = mockData.profile.bio;
+  state.catalogItems = mockData.products;
+  renderProducts(mockData.products);
+}
+
+// --- ESTILOS E FONTES DINÂMICAS ---
 function applyTheme(theme) {
   const root = document.documentElement;
-  
-  // Injeta variáveis CSS no root
   root.style.setProperty('--bg-color', theme.backgroundColor);
   root.style.setProperty('--bg-gradient', theme.backgroundGradient);
   root.style.setProperty('--primary-color', theme.primaryColor);
@@ -45,7 +206,6 @@ function applyTheme(theme) {
   root.style.setProperty('--card-text', theme.cardTextColor);
   root.style.setProperty('--btn-radius', theme.borderRadius);
   
-  // Trata efeitos de Glassmorphism
   const container = document.querySelector('.mobile-container');
   if (theme.glassmorphism) {
     document.body.classList.add('glassmorphism-effect');
@@ -55,7 +215,6 @@ function applyTheme(theme) {
     if (container) container.style.backdropFilter = 'none';
   }
   
-  // Trata sombras de acordo com intensidade
   switch (theme.shadowIntensity) {
     case 'none':
       root.style.setProperty('--box-shadow', 'none');
@@ -76,7 +235,6 @@ function applyTheme(theme) {
       break;
   }
 
-  // Carrega fontes do Google Fonts dinamicamente
   loadGoogleFont(theme.fontFamily);
 }
 
@@ -89,38 +247,20 @@ function loadGoogleFont(fontName) {
   document.documentElement.style.setProperty('--font-family', `'${fontName}', sans-serif`);
 }
 
-// --- RENDERIZADORES DE CONTEÚDO ---
-function renderProfile(profile) {
-  const logoImg = document.getElementById('company-logo');
-  const companyNameEl = document.getElementById('company-name');
-  const bioEl = document.getElementById('company-bio');
-  const btnContactText = document.getElementById('btn-contact-text');
-  
-  if (logoImg) logoImg.src = profile.logo;
-  if (companyNameEl) companyNameEl.textContent = profile.companyName;
-  if (bioEl) bioEl.textContent = profile.bio;
-  if (btnContactText && profile.contactButton) {
-    btnContactText.textContent = profile.contactButton.text;
-  }
-}
-
-// Helper para obter ícones SVG das redes sociais
-function getSocialIconSvg(platform) {
-  const icons = {
-    instagram: `<svg viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.051.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 1 0 0 12.324 6.162 6.162 0 0 0 0-12.324zM12 16a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm6.406-11.845a1.44 1.44 0 1 0 0 2.881 1.44 1.44 0 0 0 0-2.881z"/></svg>`,
-    whatsapp: `<svg viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.514 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.713-1.458L0 24zm6.59-4.846c1.6.95 3.167 1.449 4.825 1.451 5.436 0 9.86-4.42 9.864-9.864.002-2.637-1.019-5.117-2.875-6.976C16.606 1.907 14.123.886 11.487.886c-5.437 0-9.863 4.417-9.867 9.86 0 1.769.467 3.498 1.354 5.034L1.93 22.07l6.505-1.705c-1.523.83-3.13 1.267-4.788 1.267zM17.433 14.28c-.312-.156-1.85-.913-2.137-1.017-.287-.104-.496-.156-.704.156-.208.312-.806.913-.988 1.121-.182.208-.364.234-.676.078-.312-.156-1.318-.486-2.51-1.549-.928-.827-1.554-1.849-1.736-2.161-.182-.312-.02-.481.136-.636.141-.14.312-.364.468-.546.156-.182.208-.312.312-.52.104-.208.052-.39-.026-.546-.078-.156-.704-1.7-.963-2.327-.253-.607-.51-.525-.7-.535-.18-.01-.387-.01-.595-.01-.208 0-.547.078-.832.39-.286.312-1.092 1.066-1.092 2.6s1.118 3.016 1.274 3.224c.156.208 2.2 3.36 5.33 4.715.745.322 1.326.515 1.782.66.748.238 1.43.204 1.97.124.602-.09 1.85-.754 2.11-1.443.26-.69.26-1.282.182-1.403-.077-.12-.285-.195-.597-.35z"/></svg>`,
-    linkedin: `<svg viewBox="0 0 24 24"><path d="M22.23 0H1.77C.8 0 0 .77 0 1.72v20.56C0 23.23.8 24 1.77 24h20.46c.98 0 1.77-.77 1.77-1.72V1.72C24 .77 23.2 0 22.23 0zM7.12 20.45H3.56V9h3.56v11.45zM5.34 7.43c-1.14 0-2.06-.92-2.06-2.06 0-1.14.92-2.06 2.06-2.06 1.14 0 2.06.92 2.06 2.06 0 1.14-.92 2.06-2.06 2.06zm15.11 13.02h-3.56v-5.6c0-1.34-.03-3.05-1.86-3.05-1.86 0-2.14 1.45-2.14 2.95v5.7H9.33V9h3.42v1.56h.05c.48-.9 1.64-1.85 3.37-1.85 3.6 0 4.27 2.37 4.27 5.45v6.29z"/></svg>`,
-    youtube: `<svg viewBox="0 0 24 24"><path d="M23.498 6.163a3.003 3.003 0 0 0-2.11-2.11C19.517 3.545 12 3.545 12 3.545s-7.516 0-9.387.507a3.003 3.003 0 0 0-2.11 2.11C0 8.033 0 12 0 12s0 3.967.502 5.837a3.003 3.003 0 0 0 2.11 2.11c1.871.507 9.386.507 9.386.507s7.517 0 9.387-.507a3.003 3.003 0 0 0 2.11-2.11C24 15.967 24 12 24 12s0-3.967-.502-5.837zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>`,
-    github: `<svg viewBox="0 0 24 24"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>`
-  };
-  return icons[platform] || `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>`;
-}
-
+// --- RENDERIZADORES ---
 function renderSocials(socials) {
   const container = document.getElementById('socials-container');
   if (!container) return;
   
-  container.innerHTML = socials.map(social => `
+  // Utiliza o número de WhatsApp configurado na API se disponível, senão fallback do mock
+  const activeSocials = socials.map(s => {
+    if (s.icon === 'whatsapp' && WHATSAPP) {
+      return { ...s, url: `https://wa.me/${WHATSAPP}?text=Ol%C3%A1%21+Vim+da+landing+page%21` };
+    }
+    return s;
+  });
+
+  container.innerHTML = activeSocials.map(social => `
     <a href="${social.url}" target="_blank" rel="noopener noreferrer" class="social-link" aria-label="${social.name}">
       ${getSocialIconSvg(social.name)}
     </a>
@@ -134,13 +274,13 @@ function renderProducts(products) {
   container.innerHTML = products.map(product => `
     <div class="product-card" id="card-${product.id}">
       <div class="product-image-wrapper">
-        <img src="${product.image}" alt="${product.name}" class="product-image" loading="lazy">
+        <img src="${product.image}" alt="${product.name}" class="product-image" loading="lazy" onerror="this.src='assets/product_design.png'">
         ${product.price ? `<span class="product-price-badge">${product.price}</span>` : ''}
       </div>
       <div class="product-info">
         <h3 class="product-name">${product.name}</h3>
         <p class="product-desc">${product.description}</p>
-        <button class="product-btn" data-product-name="${product.name}">
+        <button class="product-btn" data-product-id="${product.id}" data-product-name="${product.name}">
           <span>${product.buttonText || 'Ver Detalhes'}</span>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width: 14px; height: 14px;">
             <polyline points="9 18 15 12 9 6"></polyline>
@@ -150,16 +290,29 @@ function renderProducts(products) {
     </div>
   `).join('');
 
-  // Adiciona evento de clique para cada botão de produto para abrir o formulário
   container.querySelectorAll('.product-btn').forEach(btn => {
-    btn.addEventListener('click', (e) => {
+    btn.addEventListener('click', () => {
       const productName = btn.getAttribute('data-product-name');
-      openContactModal(productName);
+      const productId = btn.getAttribute('data-product-id');
+      const item = state.catalogItems.find(i => i.id === productId);
+      
+      // Se for um produto e tiver WhatsApp configurado, podemos redirecionar direto ou abrir formulário
+      if (item && !item.isService && WHATSAPP) {
+        // Redireciona diretamente para o WhatsApp do usuário de acordo com o padrão do projeto anterior
+        const waText = encodeURIComponent(`Olá! Tenho interesse no produto: *${item.name}*`);
+        const waUrl = `https://wa.me/${WHATSAPP}?text=${waText}`;
+        window.open(waUrl, '_blank');
+      } else {
+        openContactModal(productName);
+      }
     });
   });
+
+  // Atualiza as redes sociais com o WhatsApp correto
+  renderSocials(mockData.socials);
 }
 
-// --- FORMULÁRIO DE CONTATO (MODAL & VALIDAÇÃO) ---
+// --- FORMULÁRIO DE CONTATO E LEAD CAPTURE ---
 function initContactForm() {
   const btnContact = document.getElementById('btn-contact');
   const modal = document.getElementById('contact-modal');
@@ -168,66 +321,83 @@ function initContactForm() {
   const formSuccess = document.getElementById('form-success-state');
   const successClose = document.getElementById('btn-success-close');
   
-  // Abre o modal pelo botão principal
   if (btnContact) {
-    btnContact.addEventListener('click', () => {
-      openContactModal();
-    });
+    btnContact.addEventListener('click', () => openContactModal());
   }
-  
-  // Fecha o modal pelo botão 'X'
   if (modalClose) {
     modalClose.addEventListener('click', closeContactModal);
   }
-  
-  // Fecha o modal clicando fora dele
   if (modal) {
     modal.addEventListener('click', (e) => {
-      if (e.target === modal) {
-        closeContactModal();
-      }
+      if (e.target === modal) closeContactModal();
     });
   }
-  
-  // Fecha o estado de sucesso
   if (successClose) {
     successClose.addEventListener('click', closeContactModal);
   }
   
-  // Submissão do Formulário
   if (contactForm) {
-    contactForm.addEventListener('submit', (e) => {
+    contactForm.addEventListener('submit', async (e) => {
       e.preventDefault();
       
       const submitBtn = contactForm.querySelector('button[type="submit"]');
       const submitSpan = submitBtn.querySelector('span');
       const originalText = submitSpan.textContent;
       
-      // Estado de Envio/Loading
       submitBtn.disabled = true;
       submitSpan.textContent = 'Enviando...';
       
-      // Simula uma requisição AJAX para a API externa do usuário
+      const lead = {
+        name: document.getElementById('form-name').value.trim(),
+        email: document.getElementById('form-email').value.trim(),
+        phone: document.getElementById('form-phone').value.replace(/\D/g, ''),
+        message: document.getElementById('form-message').value.trim(),
+        interest: document.getElementById('form-product-interest').value
+      };
+      
+      // Envia à API se configurada
+      if (API_URL && API_KEY) {
+        try {
+          console.log('[API] Enviando lead de contato para o backend...', lead);
+          // Envia dados de contato. Tenta /external/v1/leads ou /external/v1/booking
+          await apiCall('/external/v1/leads', {
+            method: 'POST',
+            body: JSON.stringify(lead)
+          }).catch(async () => {
+            // Fallback caso o endpoint seja apenas booking
+            const payload = {
+              customerName: lead.name,
+              customerEmail: lead.email,
+              customerPhone: lead.phone,
+              observation: `Interesse em: ${lead.interest}. Mensagem: ${lead.message}`,
+              createOrder: false
+            };
+            return await apiCall('/external/v1/booking', {
+              method: 'POST',
+              body: JSON.stringify(payload)
+            });
+          });
+        } catch (err) {
+          console.error('Erro ao enviar lead para API:', err.message);
+        }
+      }
+
+      // Redireciona para o WhatsApp de qualquer forma se configurado (Garante conversão imediata)
+      const waNumber = WHATSAPP || '5511999999999';
+      const waText = encodeURIComponent(`Olá! Meu nome é *${lead.name}*.\nE-mail: ${lead.email}\nWhatsApp: ${lead.phone}\nInteresse: *${lead.interest || 'Geral'}*\n\nMensagem: ${lead.message}`);
+      const waUrl = `https://wa.me/${waNumber}?text=${waText}`;
+      
+      // Abre WhatsApp
       setTimeout(() => {
-        // Coleta dados (apenas demonstração conceitual no console)
-        const lead = {
-          nome: document.getElementById('form-name').value,
-          email: document.getElementById('form-email').value,
-          telefone: document.getElementById('form-phone').value,
-          mensagem: document.getElementById('form-message').value,
-          interesse: document.getElementById('form-product-interest').value,
-          dataEnvio: new Date().toISOString()
-        };
-        console.log('Lead Capturado com sucesso! Dados que seriam enviados à API:', lead);
+        window.open(waUrl, '_blank');
         
-        // Exibe tela de sucesso e esconde formulário
+        // Exibe tela de sucesso
         contactForm.style.display = 'none';
         formSuccess.classList.remove('hidden');
         
-        // Reseta o botão de envio
         submitBtn.disabled = false;
         submitSpan.textContent = originalText;
-      }, 1200);
+      }, 800);
     });
   }
 }
@@ -242,7 +412,6 @@ function openContactModal(interestedProduct = null) {
   
   if (!modal) return;
   
-  // Configura o formulário
   if (contactForm) {
     contactForm.reset();
     contactForm.style.display = 'flex';
@@ -250,19 +419,17 @@ function openContactModal(interestedProduct = null) {
   if (formSuccess) formSuccess.classList.add('hidden');
   
   if (interestedProduct) {
-    // Configura o modal se o usuário tiver interesse em um produto específico
     if (interestInput) interestInput.value = interestedProduct;
     if (messageArea) messageArea.value = `Gostaria de solicitar contato e orçamento sobre o serviço: ${interestedProduct}.`;
     if (modalTitle) modalTitle.textContent = `Interesse: ${interestedProduct}`;
   } else {
-    // Caso geral
     if (interestInput) interestInput.value = '';
     if (messageArea) messageArea.value = mockData.profile.contactButton.placeholderMessage || '';
     if (modalTitle) modalTitle.textContent = 'Solicitar Contato';
   }
   
   modal.classList.add('open');
-  document.body.style.overflow = 'hidden'; // Impede scroll do body com modal aberto
+  document.body.style.overflow = 'hidden';
 }
 
 function closeContactModal() {
@@ -270,6 +437,89 @@ function closeContactModal() {
   if (!modal) return;
   modal.classList.remove('open');
   document.body.style.overflow = '';
+}
+
+// --- MODAL DE CONFIGURAÇÃO DA API (GERENCIAMENTO DE CREDENCIAIS) ---
+function initConfigModal() {
+  const settingsBtn = document.getElementById('settings-btn');
+  const configOverlay = document.getElementById('config-overlay');
+  const configClose = document.getElementById('config-close');
+  const configCancel = document.getElementById('btn-config-cancel');
+  const configSave = document.getElementById('btn-config-save');
+  const secretInput = document.getElementById('cfg-api-secret');
+  const secretToggle = document.getElementById('cfg-secret-toggle');
+  
+  if (!configOverlay) return;
+
+  if (settingsBtn) {
+    settingsBtn.addEventListener('click', openConfigModal);
+  }
+  if (configClose) {
+    configClose.addEventListener('click', closeConfigModal);
+  }
+  if (configCancel) {
+    configCancel.addEventListener('click', closeConfigModal);
+  }
+  
+  configOverlay.addEventListener('click', (e) => {
+    if (e.target === configOverlay) closeConfigModal();
+  });
+
+  // Mostrar/Ocultar Segredo
+  if (secretToggle && secretInput) {
+    secretToggle.addEventListener('click', () => {
+      if (secretInput.type === 'password') {
+        secretInput.type = 'text';
+        secretToggle.textContent = 'Ocultar';
+      } else {
+        secretInput.type = 'password';
+        secretToggle.textContent = 'Mostrar';
+      }
+    });
+  }
+
+  // Salvar Credenciais
+  if (configSave) {
+    configSave.addEventListener('click', () => {
+      const cfg = {
+        businessName: document.getElementById('cfg-business-name').value.trim(),
+        apiUrl: document.getElementById('cfg-api-url').value.trim().replace(/\/$/, ''),
+        apiKey: document.getElementById('cfg-api-key').value.trim(),
+        apiSecret: document.getElementById('cfg-api-secret').value.trim(),
+        whatsapp: document.getElementById('cfg-whatsapp').value.replace(/\D/g, '')
+      };
+      
+      persistConfig(cfg);
+      closeConfigModal();
+      
+      // Feedback Visual
+      alert('Configurações da API salvas com sucesso! A página será atualizada.');
+      window.location.reload();
+    });
+  }
+}
+
+function openConfigModal() {
+  const cfg = loadConfig();
+  document.getElementById('cfg-business-name').value = cfg.businessName;
+  document.getElementById('cfg-api-url').value = cfg.apiUrl;
+  document.getElementById('cfg-api-key').value = cfg.apiKey;
+  document.getElementById('cfg-api-secret').value = cfg.apiSecret;
+  document.getElementById('cfg-whatsapp').value = cfg.whatsapp;
+  
+  const configOverlay = document.getElementById('config-overlay');
+  if (configOverlay) {
+    configOverlay.classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+}
+
+function closeConfigModal() {
+  const configOverlay = document.getElementById('config-overlay');
+  if (configOverlay) {
+    configOverlay.classList.remove('open');
+    document.body.style.overflow = '';
+  }
 }
 
 // --- SWITCHER DE LAYOUT (GRID E CARROSSEL) ---
@@ -287,44 +537,41 @@ function initLayoutSwitcher() {
     btn.addEventListener('click', () => {
       const layout = btn.getAttribute('data-layout');
       
-      // Atualiza estado visual do switcher
       switcherBtns.forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       switcher.setAttribute('data-active-layout', layout);
       
-      // Atualiza layout do catálogo
       if (layout === 'carousel') {
         catalog.classList.remove('layout-grid');
         catalog.classList.add('layout-carousel');
-        
-        // Exibe indicadores e controles de navegação
         setupCarouselIndicators();
         if (indicatorsContainer) indicatorsContainer.classList.remove('hidden');
-        
       } else {
         catalog.classList.remove('layout-carousel');
         catalog.classList.add('layout-grid');
-        
-        // Esconde indicadores
         if (indicatorsContainer) indicatorsContainer.classList.add('hidden');
       }
     });
   });
   
-  // Configura navegação do Carrossel (Prev e Next)
   if (carouselNavPrev && carouselNavNext) {
     carouselNavPrev.addEventListener('click', () => {
-      const cardWidth = catalog.querySelector('.product-card').offsetWidth;
-      catalog.scrollBy({ left: -cardWidth - 16, behavior: 'smooth' });
+      const card = catalog.querySelector('.product-card');
+      if (card) {
+        const cardWidth = card.offsetWidth;
+        catalog.scrollBy({ left: -cardWidth - 16, behavior: 'smooth' });
+      }
     });
     
     carouselNavNext.addEventListener('click', () => {
-      const cardWidth = catalog.querySelector('.product-card').offsetWidth;
-      catalog.scrollBy({ left: cardWidth + 16, behavior: 'smooth' });
+      const card = catalog.querySelector('.product-card');
+      if (card) {
+        const cardWidth = card.offsetWidth;
+        catalog.scrollBy({ left: cardWidth + 16, behavior: 'smooth' });
+      }
     });
   }
 
-  // Listener de rolagem do carrossel para atualizar os indicadores/dots
   catalog.addEventListener('scroll', () => {
     if (!catalog.classList.contains('layout-carousel')) return;
     updateActiveIndicator();
@@ -341,13 +588,11 @@ function setupCarouselIndicators() {
     <span class="indicator-dot ${index === 0 ? 'active' : ''}" data-index="${index}"></span>
   `).join('');
   
-  // Adiciona evento de clique para os dots
   indicatorsContainer.querySelectorAll('.indicator-dot').forEach(dot => {
     dot.addEventListener('click', () => {
       const index = parseInt(dot.getAttribute('data-index'), 10);
       const card = catalog.querySelectorAll('.product-card')[index];
       if (card) {
-        // Encontra o scroll exacto
         catalog.scrollTo({
           left: card.offsetLeft - catalog.offsetLeft - 16,
           behavior: 'smooth'
@@ -387,7 +632,7 @@ function updateActiveIndicator() {
   });
 }
 
-// --- PAINEL DO TWEAK DE CONFIGURAÇÃO (SIMULADOR DE RESPOSTA DA API) ---
+// --- PAINEL DO TWEAK DE CONFIGURAÇÃO (SIMULADOR DE TEMA) ---
 function initTweakPanel() {
   const panel = document.getElementById('tweak-panel');
   const toggle = document.getElementById('tweak-toggle');
@@ -395,19 +640,16 @@ function initTweakPanel() {
   
   if (!panel || !toggle || !presetsList) return;
   
-  // Abre/fecha painel ao clicar no botão
   toggle.addEventListener('click', () => {
     panel.classList.toggle('expanded');
   });
 
-  // Fecha painel ao clicar fora dele
   document.addEventListener('click', (e) => {
     if (!panel.contains(e.target)) {
       panel.classList.remove('expanded');
     }
   });
   
-  // Renderiza botões para selecionar os presets de temas vindos da API
   presetsList.innerHTML = Object.entries(themePresets).map(([key, value]) => `
     <button class="theme-preset-btn ${key === 'darkOrbit' ? 'active' : ''}" data-theme-key="${key}">
       <span>${value.name}</span>
@@ -419,22 +661,46 @@ function initTweakPanel() {
     </button>
   `).join('');
   
-  // Vincula evento de clique em cada tema para simular a resposta da API do usuário
   presetsList.querySelectorAll('.theme-preset-btn').forEach(btn => {
     btn.addEventListener('click', (e) => {
-      e.stopPropagation(); // Impede o fechamento do painel
-      
+      e.stopPropagation();
       const themeKey = btn.getAttribute('data-theme-key');
       const selectedTheme = themePresets[themeKey];
       
-      // Aplica o tema na LP
+      state.theme = selectedTheme;
       applyTheme(selectedTheme);
       
-      // Atualiza classe active nos botões
       presetsList.querySelectorAll('.theme-preset-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       
-      console.log(`[API SIMULATOR] Novo layout recebido da API externa: ${selectedTheme.name}`, selectedTheme);
+      console.log(`[Theme Preset] Novo layout de cores aplicado: ${selectedTheme.name}`);
     });
   });
+}
+
+// --- AUXILIARES E ICONES ---
+function fmtCurrency(value) {
+  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
+    .format(parseFloat(value || 0));
+}
+
+function getMainImage(prod) {
+  const imgs = prod.images || [];
+  const main = imgs.find(i => i.isMain) || imgs.sort((a, b) => a.position - b.position)[0];
+  return main?.url || null;
+}
+
+function getFirstVariant(prod) {
+  return (prod.variants || []).find(v => v.isActive !== false) || prod.variants?.[0] || null;
+}
+
+function getSocialIconSvg(platform) {
+  const icons = {
+    instagram: `<svg viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.051.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 1 0 0 12.324 6.162 6.162 0 0 0 0-12.324zM12 16a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm6.406-11.845a1.44 1.44 0 1 0 0 2.881 1.44 1.44 0 0 0 0-2.881z"/></svg>`,
+    whatsapp: `<svg viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.514 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.713-1.458L0 24zm6.59-4.846c1.6.95 3.167 1.449 4.825 1.451 5.436 0 9.86-4.42 9.864-9.864.002-2.637-1.019-5.117-2.875-6.976C16.606 1.907 14.123.886 11.487.886c-5.437 0-9.863 4.417-9.867 9.86 0 1.769.467 3.498 1.354 5.034L1.93 22.07l6.505-1.705c-1.523.83-3.13 1.267-4.788 1.267zM17.433 14.28c-.312-.156-1.85-.913-2.137-1.017-.287-.104-.496-.156-.704.156-.208.312-.806.913-.988 1.121-.182.208-.364.234-.676.078-.312-.156-1.318-.486-2.51-1.549-.928-.827-1.554-1.849-1.736-2.161-.182-.312-.02-.481.136-.636.141-.14.312-.364.468-.546.156-.182.208-.312.312-.52.104-.208.052-.39-.026-.546-.078-.156-.704-1.7-.963-2.327-.253-.607-.51-.525-.7-.535-.18-.01-.387-.01-.595-.01-.208 0-.547.078-.832.39-.286.312-1.092 1.066-1.092 2.6s1.118 3.016 1.274 3.224c.156.208 2.2 3.36 5.33 4.715.745.322 1.326.515 1.782.66.748.238 1.43.204 1.97.124.602-.09 1.85-.754 2.11-1.443.26-.69.26-1.282.182-1.403-.077-.12-.285-.195-.597-.35z"/></svg>`,
+    linkedin: `<svg viewBox="0 0 24 24"><path d="M22.23 0H1.77C.8 0 0 .77 0 1.72v20.56C0 23.23.8 24 1.77 24h20.46c.98 0 1.77-.77 1.77-1.72V1.72C24 .77 23.2 0 22.23 0zM7.12 20.45H3.56V9h3.56v11.45zM5.34 7.43c-1.14 0-2.06-.92-2.06-2.06 0-1.14.92-2.06 2.06-2.06 1.14 0 2.06.92 2.06 2.06 0 1.14-.92 2.06-2.06 2.06zm15.11 13.02h-3.56v-5.6c0-1.34-.03-3.05-1.86-3.05-1.86 0-2.14 1.45-2.14 2.95v5.7H9.33V9h3.42v1.56h.05c.48-.9 1.64-1.85 3.37-1.85 3.6 0 4.27 2.37 4.27 5.45v6.29z"/></svg>`,
+    youtube: `<svg viewBox="0 0 24 24"><path d="M23.498 6.163a3.003 3.003 0 0 0-2.11-2.11C19.517 3.545 12 3.545 12 3.545s-7.516 0-9.387.507a3.003 3.003 0 0 0-2.11 2.11C0 8.033 0 12 0 12s0 3.967.502 5.837a3.003 3.003 0 0 0 2.11 2.11c1.871.507 9.386.507 9.386.507s7.517 0 9.387-.507a3.003 3.003 0 0 0 2.11-2.11C24 15.967 24 12 24 12s0-3.967-.502-5.837zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>`,
+    github: `<svg viewBox="0 0 24 24"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>`
+  };
+  return icons[platform] || `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>`;
 }
