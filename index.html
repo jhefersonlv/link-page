@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Orbit - Linktree Premium</title>
+  
+  <!-- Preconectar fontes comuns -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link id="dynamic-font" href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+  
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Container Principal do Aplicativo (Centralizado, Mobile-First) -->
+  <main class="app-wrapper">
+    <div class="mobile-container">
+      
+      <!-- Cabeçalho do Perfil -->
+      <header class="profile-header">
+        <div class="logo-wrapper">
+          <img id="company-logo" src="assets/logo.png" alt="Logo" class="profile-logo">
+          <div class="logo-glow"></div>
+        </div>
+        <h1 id="company-name" class="profile-title">Carregando...</h1>
+        <p id="company-bio" class="profile-bio">Carregando informações da empresa...</p>
+      </header>
+
+      <!-- CTA Principal (Entre em Contato) -->
+      <section class="cta-section">
+        <button id="btn-contact" class="btn-primary">
+          <span id="btn-contact-text">Entre em Contato</span>
+          <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+            <polyline points="22,6 12,13 2,6"></polyline>
+          </svg>
+        </button>
+      </section>
+
+      <!-- Redes Sociais -->
+      <section class="socials-section">
+        <div id="socials-container" class="socials-list">
+          <!-- Gerado dinamicamente -->
+        </div>
+      </section>
+
+      <!-- Seção de Produtos & Serviços -->
+      <section class="products-section">
+        <div class="section-header">
+          <h2 class="section-title">Produtos & Serviços</h2>
+          
+          <!-- Tweak / Switcher de Layout -->
+          <div class="layout-switcher" role="radiogroup" aria-label="Visualização do Catálogo">
+            <div class="slider-bg"></div>
+            <button class="switcher-btn active" data-layout="grid" aria-checked="true" role="radio" title="Visualização em Grid">
+              <svg class="switcher-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="3" width="7" height="7"></rect>
+                <rect x="14" y="3" width="7" height="7"></rect>
+                <rect x="14" y="14" width="7" height="7"></rect>
+                <rect x="3" y="14" width="7" height="7"></rect>
+              </svg>
+            </button>
+            <button class="switcher-btn" data-layout="carousel" aria-checked="false" role="radio" title="Visualização em Carrossel">
+              <svg class="switcher-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                <line x1="9" y1="3" x2="9" y2="21"></line>
+                <line x1="15" y1="3" x2="15" y2="21"></line>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Container do Catálogo (Grid / Carrossel) -->
+        <div class="catalog-container-outer">
+          <!-- Botões de navegação para o carrossel (visíveis apenas no modo carrossel) -->
+          <button class="carousel-nav-btn prev" aria-label="Anterior">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
+          </button>
+          
+          <div id="catalog-container" class="catalog-container layout-grid">
+            <!-- Os cards dos produtos serão inseridos aqui dinamicamente -->
+          </div>
+          
+          <button class="carousel-nav-btn next" aria-label="Próximo">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
+          </button>
+        </div>
+
+        <!-- Indicadores de página no Carrossel -->
+        <div id="carousel-indicators" class="carousel-indicators hidden">
+          <!-- Inserido via JS -->
+        </div>
+      </section>
+
+      <!-- Rodapé Discreto -->
+      <footer class="app-footer">
+        <p>Desenvolvido com <span class="heart">♥</span> por Orbit</p>
+      </footer>
+    </div>
+  </main>
+
+  <!-- Modal do Formulário de Contato -->
+  <div id="contact-modal" class="modal-overlay">
+    <div class="modal-content">
+      <button id="modal-close" class="modal-close-btn" aria-label="Fechar Formulário">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+      </button>
+      
+      <div class="modal-header">
+        <h3>Solicitar Contato</h3>
+        <p>Preencha os campos abaixo e entraremos em contato o mais rápido possível.</p>
+      </div>
+
+      <form id="contact-form" class="contact-form">
+        <div class="form-group">
+          <label for="form-name">Nome Completo</label>
+          <input type="text" id="form-name" required placeholder="Digite seu nome">
+        </div>
+        
+        <div class="form-group">
+          <label for="form-email">E-mail</label>
+          <input type="email" id="form-email" required placeholder="Digite seu e-mail">
+        </div>
+
+        <div class="form-group">
+          <label for="form-phone">WhatsApp / Telefone</label>
+          <input type="tel" id="form-phone" required placeholder="(99) 99999-9999">
+        </div>
+
+        <div class="form-group">
+          <label for="form-message">Mensagem / Observação</label>
+          <textarea id="form-message" rows="3" required placeholder="Como podemos ajudar você?"></textarea>
+        </div>
+
+        <!-- Campo oculto para registrar qual produto/serviço despertou interesse -->
+        <input type="hidden" id="form-product-interest" value="">
+
+        <button type="submit" class="btn-submit">
+          <span>Enviar Mensagem</span>
+          <svg class="btn-submit-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="22" y1="2" x2="11" y2="13"></line>
+            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+          </svg>
+        </button>
+      </form>
+
+      <!-- Estado de Sucesso (escondido inicialmente) -->
+      <div id="form-success-state" class="form-success-state hidden">
+        <div class="success-icon-wrapper">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+            <polyline points="20 6 9 17 4 12"></polyline>
+          </svg>
+        </div>
+        <h4>Mensagem Enviada!</h4>
+        <p>Agradecemos o contato. Em breve nossa equipe falará com você.</p>
+        <button id="btn-success-close" class="btn-primary-muted">Fechar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Painel do Tweak de Personalização (Demonstração da API) -->
+  <div id="tweak-panel" class="tweak-panel">
+    <button id="tweak-toggle" class="tweak-toggle-btn" aria-label="Painel de Estilos">
+      <svg class="tweak-icon animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="3"></circle>
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+      </svg>
+      <span>Estilizar LP</span>
+    </button>
+    <div class="tweak-content">
+      <div class="tweak-header">
+        <h4>Visualizador de Temas API</h4>
+        <p>Estes estilos vêm configurados na API. Clique para simular a mudança instantânea da LP do usuário!</p>
+      </div>
+      <div id="theme-presets-list" class="theme-presets-list">
+        <!-- Preenchido via JS -->
+      </div>
+      <div class="tweak-editor-info">
+        <span class="info-badge">Modo Admin Ativo</span>
+        <p>A API salva a paleta de cores, arredondamentos dos botões, fontes e efeitos. O site se adapta automaticamente.</p>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
